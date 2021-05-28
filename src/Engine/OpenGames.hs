@@ -10,6 +10,8 @@ module Engine.OpenGames
  ( OpenGame(..)
  , lift
  , reindex
+ , population
+ , fromFunctions
  , (>>>)
  , (&&&)
  ) where
@@ -45,8 +47,19 @@ reindex v u g = OpenGame {
   evaluate = \as c -> case unappend as of (a, a') -> evaluate g a (cmap identity (play h a') c)
                                                   +:+ evaluate h a' (cmap (play g a) identity c)
 }
+(+++) :: forall x1 x2 c o a a' b s y1 y2 r.
+         (Show x1, Show x2, Optic o, Context c o, ContextAdd c, Unappend a, Unappend a')
+      => OpenGame o c a b x1 s y1 r -> OpenGame o c a' b x2 s y2 r
+      -> OpenGame o c (a +:+ a') b (Either x1 x2) s (Either y1 y2) r
+(+++) g1 g2 = OpenGame
+  (\ls -> case unappend @a @a' ls of (l1, l2) -> let p1 = play g1 l1
+                                                     p2 = play g2 l2
+                                                  in p1 ++++ p2)
+  (\ls body ->
+    case unappend @a @a' ls of
+      (l1, l2) -> either (evaluate g1 l1) (evaluate g2 l2) match body
 
-(&&&) :: (Optic o, Context c o, Unappend a, Unappend b)
+(&&&) :: (Show x, Show x', Optic o, Context c o, Unappend a, Unappend b)
       => OpenGame o c a b x s y r -> OpenGame o c a' b' x' s' y' r'
       -> OpenGame o c (a +:+ a') (b +:+ b') (x, x') (s, s') (y, y') (r, r')
 (&&&) g h = OpenGame {
@@ -54,6 +67,11 @@ reindex v u g = OpenGame {
   evaluate = \as c -> case unappend as of (a, a') -> evaluate g a (play h a' \\ c)
                                                  +:+ evaluate h a' (play g a // c)
 }
+
+fromFunctions :: forall o c a b x s y r.
+  Optic o => Context c o => (x -> y) -> (r -> s) -> OpenGame o c '[] '[] x s y r
+fromFunctions f g = lift (lens f (const g))
+
 omap :: Optic o =>
         (s -> s') ->
         (x' -> x) ->
@@ -89,7 +107,7 @@ stick :: (a, Vec n a) -> Vec (S n) a
 stick (x, xs) = x :> xs
 
 population :: forall o c a b x s y r n.
-  (Optic o, Context c o, Unappend a, Unappend b) => TNat n ->
+  (Show x, Optic o, Context c o, Unappend a, Unappend b) => TNat n ->
   (Vec (S n) (OpenGame o c a b x s y r)) ->
   OpenGame o c (CatRepeat (S n) a) (CatRepeat (S n) b)
                (Vec (S n) x) (Vec (S n) s) (Vec (S n) y) (Vec (S n) r)

@@ -19,6 +19,7 @@ module Engine.OpticClass
 
 import           Control.Monad.State                hiding (state)
 import           Numeric.Probability.Distribution   hiding (lift)
+import           Data.Maybe
 
 class Optic o where
   lens :: (s -> a) -> (s -> b -> t) -> o s t a b
@@ -36,8 +37,8 @@ class Precontext c where
 
 class (Optic o, Precontext c) => Context c o where
   cmap :: o s1 t1 s2 t2 -> o a1 b1 a2 b2 -> c s1 t1 a2 b2 -> c s2 t2 a1 b1
-  (//) :: o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
-  (\\) :: o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
+  (//) :: (Show s1, Show s2) => o s1 t1 a1 b1 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s2 t2 a2 b2
+  (\\) :: (Show s1, Show s2) => o s2 t2 a2 b2 -> c (s1, s2) (t1, t2) (a1, a2) (b1, b2) -> c s1 t1 a1 b1
 
 -- (\\) is derivable from (//) using
 -- l \\ c = l // (cmap (lift swap swap) (lift swap swap) c)
@@ -49,6 +50,9 @@ class (Optic o, Precontext c) => Context c o where
 class ContextAdd c where
   prl :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s1 t a1 b)
   prr :: c (Either s1 s2) t (Either a1 a2) b -> Maybe (c s2 t a2 b)
+  match :: c (Either s1 s2) t (Either a1 a2) b -> Either (c s1 t a1 b) (c s2 t a2 b)
+  match o = maybe (maybe (error "malformed lens +++") Right (prr o))
+                                                      Left (prl o)
 
 -------------------------------------------------------------
 --- replicate the old implementation of a stochastic context
@@ -76,7 +80,7 @@ instance Optic StochasticStatefulOptic where
           u (Right z2) b = u2 z2 b
 
 data StochasticStatefulContext s t a b where
-  StochasticStatefulContext :: Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
+  StochasticStatefulContext :: Show z => Stochastic (z, s) -> (z -> a -> StateT Vector Stochastic b) -> StochasticStatefulContext s t a b
 
 instance Precontext StochasticStatefulContext where
   void = StochasticStatefulContext (return ((), ())) (\() () -> return ())

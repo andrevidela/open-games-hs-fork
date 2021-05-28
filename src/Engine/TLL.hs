@@ -7,9 +7,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE IncoherentInstances #-}
+-- {-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GADTs                 #-}
 
 
@@ -137,18 +137,12 @@ data Vec (n :: Nat) (t :: *) where
 class ToList f where
   toList :: f a -> [a]
 
-instance ToList (Vec Z) where
+instance ToList (Vec n) where
   toList Empty = []
-
-instance ToList (Vec n) => ToList (Vec (S n)) where
   toList (x :> xs) = x : toList xs
 
-instance Show (Vec Z a) where
-  show Empty = ""
-
-instance (Show a, Show (Vec n a)) => Show (Vec (S n) a) where
-  show (x :> Empty) = show x
-  show (x :> xs) = show x ++ ", " ++ show xs
+instance (Show a) => Show (Vec n a) where
+  show vec = show (toList vec)
 
 mkVec :: a -> Vec (S Z) a
 mkVec a = a :> Empty
